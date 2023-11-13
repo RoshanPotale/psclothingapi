@@ -87,37 +87,49 @@ router.post(`/`, uploadOptions.single('image'), async (req, res) =>{
     res.send(product);
 })
 
-router.put('/:id',async (req, res)=> {
-    if(!mongoose.isValidObjectId(req.params.id)) {
-       return res.status(400).send('Invalid Product Id')
+router.put('/:id', uploadOptions.single('image'), async (req, res) => {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).send('Invalid Product Id');
     }
+  
     const category = await Category.findById(req.body.category);
-    if(!category) return res.status(400).send('Invalid Category')
-
+    if (!category) return res.status(400).send('Invalid Category');
+  
+    const file = req.file;
+  
+    let imagePath = req.body.image; // Preserve the existing image path by default
+  
+    if (file) {
+      const fileName = file.filename;
+      const basePath = `${req.protocol}://${req.get('host')}/public/uploads/`;
+      imagePath = `${basePath}${fileName}`;
+    }
+  
     const product = await Product.findByIdAndUpdate(
-        req.params.id,
-        {
-            name: req.body.name,
-            description: req.body.description,
-            richDescription: req.body.richDescription,
-            image: req.body.image,
-            brand: req.body.brand,
-            price: req.body.price,
-            originalPrice: req.body.originalPrice,
-            category: req.body.category,
-            countInStock: req.body.countInStock,
-            rating: req.body.rating,
-            numReviews: req.body.numReviews,
-            isFeatured: req.body.isFeatured,
-        },
-        { new: true}
-    )
-
-    if(!product)
-    return res.status(500).send('the product cannot be updated!')
-
+      req.params.id,
+      {
+        name: req.body.name,
+        description: req.body.description,
+        richDescription: req.body.richDescription,
+        image: imagePath,
+        brand: req.body.brand,
+        price: req.body.price,
+        originalPrice: req.body.originalPrice,
+        category: req.body.category,
+        countInStock: req.body.countInStock,
+        rating: req.body.rating,
+        numReviews: req.body.numReviews,
+        isFeatured: req.body.isFeatured,
+      },
+      { new: true }
+    );
+  
+    if (!product)
+      return res.status(500).send('The product cannot be updated!');
+  
     res.send(product);
-})
+  });
+  
 
 router.delete('/:id', (req, res)=>{
     Product.findByIdAndRemove(req.params.id).then(product =>{
