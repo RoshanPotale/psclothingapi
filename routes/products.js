@@ -4,6 +4,16 @@ const { Category } = require('../models/category');
 const router = express.Router();
 const mongoose = require('mongoose');
 const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+
+          
+cloudinary.config({ 
+  cloud_name: 'dr8mqsryg', 
+  api_key: '424461863526834', 
+  api_secret: 'km5MJ6YQKbhqucXtedRK1PNRhm8' 
+});
+
+const uploadCloudinary = multer({ dest: 'uploads/' });
 
 const FILE_TYPE_MAP = {
     'image/png': 'png',
@@ -55,20 +65,22 @@ router.get(`/:id`, async (req, res) =>{
     res.send(product);
 })
 
-router.post(`/`, uploadOptions.single('image'), async (req, res) =>{
+router.post(`/`, uploadCloudinary.single('image'), async (req, res) => {
     const category = await Category.findById(req.body.category);
-    if(!category) return res.status(400).send('Invalid Category')
-
+    if (!category) return res.status(400).send('Invalid Category');
+  
     const file = req.file;
-    if(!file) return res.status(400).send('No image in the request')
-
-    const fileName = file.filename
-    const basePath = `${req.protocol}://${req.get('host')}/public/uploads/`;
-    let product = new Product({
+    if (!file) return res.status(400).send('No image in the request');
+  
+    try {
+      const result = await cloudinary.uploader.upload(file.path);
+      const imageUrl = result.secure_url;
+  
+      let product = new Product({
         name: req.body.name,
         description: req.body.description,
         richDescription: req.body.richDescription,
-        image: `${basePath}${fileName}`,// "http://localhost:3000/public/upload/image-2323232"
+        image: imageUrl,
         brand: req.body.brand,
         price: req.body.price,
         originalPrice: req.body.originalPrice,
@@ -77,17 +89,21 @@ router.post(`/`, uploadOptions.single('image'), async (req, res) =>{
         rating: req.body.rating,
         numReviews: req.body.numReviews,
         isFeatured: req.body.isFeatured,
-    })
+      });
+  
+      product = await product.save();
+  
+      if (!product) return res.status(500).send('The product cannot be created');
+  
+      res.send(product);
+    } catch (error) {
+      console.error('Error uploading image to Cloudinary:', error);
+      res.status(500).send('Internal Server Error');
+    }
+  });
+  
 
-    product = await product.save();
-
-    if(!product) 
-    return res.status(500).send('The product cannot be created')
-
-    res.send(product);
-})
-
-router.put('/:id', uploadOptions.single('image'), async (req, res) => {
+  router.put('/:id', uploadCloudinary.single('image'), async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res.status(400).send('Invalid Product Id');
     }
@@ -181,9 +197,9 @@ router.get(`/get/featured/:count`, async (req, res) =>{
 })
 
 router.put(
-    '/gallery-images/:id', 
-    uploadOptions.array('images', 10), 
-    async (req, res)=> {
+    '/gallery-images/:id',
+    uploadCloudinary.array('images', 10),
+    async (req, res) => {
         if(!mongoose.isValidObjectId(req.params.id)) {
             return res.status(400).send('Invalid Product Id')
          }
