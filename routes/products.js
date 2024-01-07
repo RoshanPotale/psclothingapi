@@ -22,24 +22,23 @@ const FILE_TYPE_MAP = {
 }
 
 const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        const isValid = FILE_TYPE_MAP[file.mimetype];
-        let uploadError = new Error('invalid image type');
+  destination: function (req, file, cb) {
+    const isValid = FILE_TYPE_MAP[file.mimetype];
+    let uploadError = new Error('invalid image type');
 
-        if(isValid) {
-            uploadError = null
-        }
-      cb(uploadError, 'public/uploads')
-    },
-    filename: function (req, file, cb) {
-        
-      const fileName = file.originalname.split(' ').join('-');
-      const extension = FILE_TYPE_MAP[file.mimetype];
-      cb(null, `${fileName}-${Date.now()}.${extension}`)
+    if (isValid) {
+      uploadError = null;
     }
-  })
+    cb(uploadError, 'public/uploads');
+  },
+  filename: function (req, file, cb) {
+    const fileName = file.originalname.split(' ').join('-');
+    const extension = FILE_TYPE_MAP[file.mimetype];
+    cb(null, `${fileName}-${Date.now()}.${extension}`);
+  }
+});
   
-const uploadOptions = multer({ storage: storage })
+const uploadOptions = multer({ storage: storage });
 
 router.get(`/`, async (req, res) =>{
     let filter = {};
@@ -104,34 +103,39 @@ router.post(`/`, uploadCloudinary.single('image'), async (req, res) => {
   
 
   router.put('/:id', uploadCloudinary.single('image'), async (req, res) => {
-    if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).send('Invalid Product Id');
-    }
-
     try {
+      const productId = req.params.id;
+  
+      // Check if the provided ID is a valid ObjectId
+      if (!mongoose.isValidObjectId(productId)) {
+        return res.status(400).send('Invalid Product Id');
+      }
+  
+      // Find the category by ID
       const category = await Category.findById(req.body.category);
-      
       if (!category) {
         return res.status(400).send('Invalid Category');
       }
-
+  
       const file = req.file;
-      let imagePath = req.body.image; // Preserve the existing image path by default
-
+      let imagePath = req.body.image;
+  
+      // If a new image is uploaded, update the imagePath
       if (file) {
         const fileName = file.filename;
         const basePath = `${req.protocol}://${req.get('host')}/public/uploads/`;
         imagePath = `${basePath}${fileName}`;
       }
-
-      const existingProduct = await Product.findById(req.params.id);
-
+  
+      // Find the existing product by ID
+      const existingProduct = await Product.findById(productId);
       if (!existingProduct) {
         return res.status(404).send('Product not found');
       }
-
-      const product = await Product.findByIdAndUpdate(
-        req.params.id,
+  
+      // Update the product with the new information
+      const updatedProduct = await Product.findByIdAndUpdate(
+        productId,
         {
           name: req.body.name,
           description: req.body.description,
@@ -148,17 +152,20 @@ router.post(`/`, uploadCloudinary.single('image'), async (req, res) => {
         },
         { new: true }
       );
-
-      if (!product) {
+  
+      // If the product was successfully updated, send the updated product as the response
+      if (updatedProduct) {
+        res.send(updatedProduct);
+      } else {
+        // If the update failed for some reason, send an appropriate error response
         return res.status(500).send('The product cannot be updated!');
       }
-
-      res.send(product);
     } catch (error) {
+      // Handle any unexpected errors and send a generic error response
       console.error('Error updating product:', error);
       res.status(500).send('Internal Server Error');
     }
-});
+  });
 
 
   
